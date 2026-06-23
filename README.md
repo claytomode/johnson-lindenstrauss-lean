@@ -19,8 +19,8 @@ Everything reduces to mathlib's three standard axioms.
 
 ## How to read this (you don't need to know Lean)
 
-If you are evaluating whether these results are *the* results you proved on paper, you only ever
-need to read the **theorem statements** — never the proof bodies.
+If you are evaluating whether these results match the corresponding statements in the source
+papers, you only ever need to read the **theorem statements** — never the proof bodies.
 
 - **You do not need to trust, or even read, the proofs.** Lean's kernel mechanically checks every
   proof step. A theorem that the build accepts is, by construction, a correct derivation from its
@@ -30,10 +30,10 @@ need to read the **theorem statements** — never the proof bodies.
   and (3) `#print axioms` on every headline theorem reports only Lean/mathlib's three standard
   foundational axioms — `propext`, `Classical.choice`, `Quot.sound` — i.e. no extra assumptions or
   escape hatches were smuggled in. The audit lives in `JL/Verify.lean`.
-- **So the only thing that needs your expertise** is the question *"does this Lean statement say
-  what my lemma says?"* The table below answers exactly that: it maps each Lean theorem to its
-  plain-math meaning and to the corresponding paper lemma, so you can spot-check the statements in a
-  couple of minutes.
+- **So the only thing that needs domain expertise** is the question *"does each Lean statement say
+  what the corresponding paper result says?"* The table below answers exactly that: it maps each
+  Lean theorem to its plain-math meaning and to the corresponding result in the source papers, so the
+  statements can be spot-checked in a couple of minutes.
 - You can read every file directly on GitHub in your browser — no need to install Lean or build
   anything. The build instructions further down are only for those who want to re-verify locally.
 
