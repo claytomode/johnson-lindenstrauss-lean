@@ -31,7 +31,7 @@ namespace JL
 /-- **Dimension bound discharges the counting condition.** If
 `4·log(2 m²) < (ε²−ε³)·k`, then the union-bound condition `m²·C < 1` holds for the JL
 failure probability `C = 2·exp(-(ε²−ε³)k/4)`. -/
-theorem card_condition {m k : ℕ} {ε : ℝ} (hc : 0 < ε ^ 2 - ε ^ 3)
+theorem card_condition {m k : ℕ} {ε : ℝ}
     (hdim : 4 * Real.log (2 * (m : ℝ) ^ 2) < (ε ^ 2 - ε ^ 3) * (k : ℝ)) :
     (m : ℝ) ^ 2 * (2 * rexp (-(ε ^ 2 - ε ^ 3) * (k : ℝ) / 4)) < 1 := by
   rcases Nat.eq_zero_or_pos m with rfl | hm
@@ -58,8 +58,6 @@ theorem johnson_lindenstrauss_pointset {m d k : ℕ} (hk : 0 < k)
     ∃ A : Fin k → Fin d → ℝ, ∀ a b, a ≠ b →
       |(∑ i, (jlMap k d A (fun j => (p a - p b) j) i) ^ 2) - ‖p a - p b‖ ^ 2|
         < ε * ‖p a - p b‖ ^ 2 := by
-  have hc : 0 < ε ^ 2 - ε ^ 3 := by
-    nlinarith [mul_pos (pow_pos h0 2) (sub_pos.mpr h1)]
   apply johnson_lindenstrauss (μ := gaussianMatrix k d)
     (C := 2 * rexp (-(ε ^ 2 - ε ^ 3) * (k : ℝ) / 4))
     (r := fun a b A => ∑ i, (jlMap k d A (fun j => (p a - p b) j) i) ^ 2)
@@ -75,6 +73,6 @@ theorem johnson_lindenstrauss_pointset {m d k : ℕ} (hk : 0 < k)
     rw [hnorm] at hconc
     exact hconc
   · positivity
-  · exact card_condition hc hdim
+  · exact card_condition hdim
 
 end JL
