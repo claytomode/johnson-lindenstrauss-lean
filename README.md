@@ -11,10 +11,11 @@ projection, and a union bound over pairs upgrades the per-vector guarantee to a 
 projection that preserves *all* pairwise distances. The QJL layer adds the
 asymmetric sign-product identity `E[sign⟨u,g⟩·⟨v,g⟩] = √(2/π)·⟨u,v⟩` (the one-sided one-bit
 analogue — *not* the symmetric Grothendieck arcsin law `E[sign⟨u,g⟩·sign⟨v,g⟩] = (2/π)·arcsin⟨u,v⟩`)
-and builds the unbiased estimator and its variance/Chebyshev tail on top of it. The
-unconditionally-proven distortion guarantee is the Chebyshev bound; an exponential sub-Gaussian
-sharpening is also proven, conditional on one isolated sub-Gaussian hypothesis. Everything reduces
-to mathlib's three standard axioms.
+and builds the unbiased estimator and its variance/Chebyshev tail on top of it. Both distortion
+guarantees — the Chebyshev bound *and* the sharp exponential sub-Gaussian (Chernoff) sharpening —
+are proven fully unconditionally; the latter rests on a folded-normal sub-Gaussian estimate built
+from scratch in `JL/GaussianTail.lean` (mathlib lacks `erf` / Gaussian-CDF concentration).
+Everything reduces to mathlib's three standard axioms.
 
 ## Main results
 
@@ -78,24 +79,30 @@ theorem qjlEstimator_concentration {m d : ℕ} (hm : 0 < m)
 ```
 
 **QJL exponential distortion bound** (`JL/QJLDistortion.lean`) — the sub-Gaussian / Chernoff
-sharpening of the Chebyshev bound: the deviation probability decays *exponentially* in `m`, namely
-`2·exp(-m·ε²/(π·‖q‖²))`, so `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits suffice for additive error `ε` with
-probability `1 − δ`. This exponential `log(1/δ)` form is what matches the QJL paper's published
-distortion guarantee (Lemma 3 of [arXiv:2406.03482](https://arxiv.org/abs/2406.03482)); the bound
-proven *unconditionally* in this project is instead the weaker Chebyshev one
-`m = O(‖q‖²/(ε²δ))` above. In other words, the sharp / published-strength tail is exactly the one
-resting on the `IsPerRowSubgaussian` hypothesis: a single isolated assumption that the centered
-per-row sign-product term has a sub-Gaussian MGF with variance proxy `(π/2)‖q‖²` (see
-"Scope / not yet done").
+sharpening of the Chebyshev bound, now **fully unconditional**: the deviation probability decays
+*exponentially* in `m`, namely `2·exp(-m·ε²/(π·‖q‖²))`, so `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits
+suffice for additive error `ε` with probability `1 − δ`. This exponential `log(1/δ)` form matches
+the QJL paper's published distortion guarantee (Lemma 3 of
+[arXiv:2406.03482](https://arxiv.org/abs/2406.03482)). The per-row sub-Gaussian MGF bound it rests
+on (formerly an `IsPerRowSubgaussian` hypothesis) is now proven from scratch as
+`isPerRowSubgaussian_normalized`, via the folded-normal sub-Gaussian estimate
+`foldedNormal_subgaussian` in `JL/GaussianTail.lean`.
 
 ```lean
 theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
-    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε)
-    (hsub : IsPerRowSubgaussian (‖key‖⁻¹ • key) q) :
+    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε) :
     (Measure.pi
         (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
         {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
       ≤ 2 * Real.exp (-((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2))
+```
+
+The folded-normal sub-Gaussian estimate is the key new analytic ingredient (`JL/GaussianTail.lean`):
+for `Z ~ N(0,1)`, the centered absolute value `|Z| − √(2/π)` is `1`-sub-Gaussian.
+
+```lean
+theorem foldedNormal_subgaussian :
+    HasSubgaussianMGF (fun z : ℝ => |z| - √(2 / π)) ⟨1, by norm_num⟩ (gaussianReal 0 1)
 ```
 
 ### Supporting results
@@ -116,6 +123,13 @@ theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
 - `JL.qjlEstimator_centered_hasSubgaussianMGF` — the centered estimator is sub-Gaussian with
   variance proxy `(π/2)‖q‖²/m`, assembled from the `m` independent rows (`iIndepFun_pi`,
   `HasSubgaussianMGF.sum_of_iIndepFun`) and the `1/m` rescaling.
+- `JL.foldedNormal_subgaussian` (`JL/GaussianTail.lean`) — the centered folded normal `|Z| − √(2/π)`
+  is `1`-sub-Gaussian, with supporting lemmas `JL.gaussian_foldedMGF` (closed-form folded-normal
+  MGF), `JL.hasDerivAt_gTail`, and `JL.two_g_le` (the sharp inequality `√(2/π)·gTail t ≤ exp(t√(2/π))`,
+  i.e. `2·Φ(t) ≤ exp(t√(2/π))`).
+- `JL.isPerRowSubgaussian_of_unit` / `JL.isPerRowSubgaussian_normalized` — the per-row sub-Gaussian
+  MGF bound (variance proxy `(π/2)‖q‖²`), proven by orthogonal decomposition `q = ⟪u,q⟫•u + w`,
+  pushforward to the independent product law `N(0,1) ⊗ N(0,‖w‖²)`, and Pythagoras.
 
 ## Layout
 
@@ -133,7 +147,10 @@ The dependency chain flows top to bottom:
 - `JL/InnerProduct.lean` — inner-product preservation corollary (the QJL/TurboQuant tie-in).
 - `JL/QJL.lean` — Gaussian absolute moment, the sign-product identity, and QJL estimator
   unbiasedness.
-- `JL/QJLDistortion.lean` — per-row and estimator variance, and the Chebyshev distortion bound.
+- `JL/GaussianTail.lean` — the folded-normal sub-Gaussian estimate (`foldedNormal_subgaussian`) and
+  its analytic supporting lemmas, built from scratch against mathlib.
+- `JL/QJLDistortion.lean` — per-row and estimator variance, the Chebyshev distortion bound, and the
+  unconditional exponential (sub-Gaussian / Chernoff) distortion bound.
 - `JL/Verify.lean` — sanity instantiations and the `#print axioms` audit.
 - `JL.lean` — umbrella import of all of the above.
 
@@ -157,26 +174,20 @@ only on mathlib's three standard axioms:
 ```
 
 There are no uses of `sorry`, `admit`, custom `axiom` declarations, or `native_decide` anywhere
-in the development. (The exponential distortion bound takes the per-row sub-Gaussian fact as an
-explicit hypothesis `IsPerRowSubgaussian` — see below — so it too reduces to the three axioms.)
+in the development. The exponential distortion bound is now unconditional (the former
+`IsPerRowSubgaussian` hypothesis is discharged), so it too reduces to the three axioms.
 
 ## Scope / not yet done
 
-- **The one demoted step: `IsPerRowSubgaussian`.** The exponential QJL tail
-  (`qjlEstimator_concentration_exp`) is fully proven *except* for a single isolated, clearly-true
-  hypothesis: that the centered per-row term `g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫` has a sub-Gaussian
-  MGF with variance proxy `(π/2)‖q‖²`. Everything downstream — coordinate independence under
-  `Measure.pi`, additivity of the sub-Gaussian parameter over the `m` independent rows, the `1/m`
-  rescaling, and the two-sided Chernoff bound — is discharged unconditionally. A mathlib proof of
-  `IsPerRowSubgaussian` itself needs a folded-normal / `erf` sub-Gaussian estimate for `|⟪u,g⟫|`
-  that is not yet available (the crude `exp(t|x|) ≤ exp(tx)+exp(−tx)` bound loses a factor `2` per
-  row, fatal across `m` rows), so it is left as the remaining analytic gap.
 - **PolarQuant stage-1 MSE bound** and **full TurboQuant two-stage near-optimality** are out of
   scope here.
-- **Not upstreamed.** This lives as a standalone project, not (yet) part of mathlib. A few helper
-  lemmas (`measurable_real_sign`, the `Real.sign`-valued `sign_mul_self`, and
-  `integral_abs_gaussianReal`) have no exact mathlib equivalent and would be natural upstream
-  candidates; a couple of files still `import Mathlib` wholesale rather than minimal imports.
+- **Mathlib-PR candidates.** The folded-normal sub-Gaussian development in `JL/GaussianTail.lean`
+  fills a real gap: mathlib has no `erf` / Gaussian-CDF concentration, and these lemmas
+  (`gaussian_foldedMGF`, `hasDerivAt_gTail`, `two_g_le`, `foldedNormal_subgaussian`) are natural
+  upstream candidates, as are the small helpers `measurable_real_sign`, the `Real.sign`-valued
+  `sign_mul_self`, `integral_abs_gaussianReal`, and `gaussianReal_mgf_id`.
+- **Not upstreamed.** This lives as a standalone project, not (yet) part of mathlib; a couple of
+  files still `import Mathlib` wholesale rather than minimal imports.
 
 ## License
 
