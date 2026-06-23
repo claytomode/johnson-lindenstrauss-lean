@@ -6,6 +6,7 @@ import JL.Rotation
 import JL.Lemma
 import JL.EndToEnd
 import JL.InnerProduct
+import JL.GaussianTail
 import JL.QJL
 import JL.QJLDistortion
 import JL.Verify
