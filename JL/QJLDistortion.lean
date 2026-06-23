@@ -1,4 +1,5 @@
 import JL.QJL
+import JL.GaussianTail
 import Mathlib.Probability.Moments.Variance
 import Mathlib.Probability.Moments.SubGaussian
 
@@ -209,6 +210,251 @@ exponential distortion bound below. It is the *only* demoted step in the entire 
       Real.sqrt (π / 2) * Real.sign (⟪u, g⟫) * ⟪q, g⟫ - ⟪u, q⟫)
     ⟨π / 2 * ‖q‖ ^ 2, by positivity⟩
     (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))
+
+/-- The moment generating function of a centered real Gaussian: `∫ exp(r·b) d(N(0,v)) = exp(v·r²/2)`. -/
+theorem gaussianReal_mgf_id (r : ℝ) (v : ℝ≥0) :
+    ∫ b, rexp (r * b) ∂(gaussianReal 0 v) = rexp ((v : ℝ) * r ^ 2 / 2) := by
+  have h := mgf_gaussianReal (X := (id : ℝ → ℝ)) (p := gaussianReal (0 : ℝ) v) Measure.map_id r
+  rw [mgf] at h
+  simpa using h
+
+open scoped RealInnerProductSpace in
+/-- **Per-row sub-Gaussian MGF bound (unit `u`), proved unconditionally.** For a unit vector `u`
+and arbitrary `q`, the centered `√(π/2)`-scaled sign-product term
+`g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫` is sub-Gaussian with variance proxy `(π/2)·‖q‖²` under the
+standard Gaussian.
+
+The proof decomposes `q = ⟪u,q⟫·u + w` with `w ⟂ u`. Under the standard Gaussian, `a := ⟪u,g⟫`
+and `b := ⟪w,g⟫` are independent, with `a ~ N(0,1)` and `b ~ N(0,‖w‖²)`. Pushing forward to the
+product law `N(0,1) ⊗ N(0,‖w‖²)` and integrating in `b` first (Gaussian MGF) leaves a folded-normal
+integral in `a`, controlled by `foldedNormal_subgaussian`. The two variance proxies combine to
+`(π/2)(⟪u,q⟫² + ‖w‖²) = (π/2)‖q‖²` by Pythagoras. -/
+theorem isPerRowSubgaussian_of_unit {d : ℕ} (u q : EuclideanSpace ℝ (Fin d)) (hu : ‖u‖ = 1) :
+    IsPerRowSubgaussian u q := by
+  classical
+  set μ : Measure (EuclideanSpace ℝ (Fin d)) :=
+    ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)) with hμ
+  haveI hμprob : IsProbabilityMeasure μ := by rw [hμ]; infer_instance
+  set s0 : ℝ := Real.sqrt (π / 2) with hs0
+  have hs0nn : (0 : ℝ) ≤ s0 := Real.sqrt_nonneg _
+  have hs0sq : s0 ^ 2 = π / 2 := Real.sq_sqrt (by positivity)
+  have hs0cc : s0 * Real.sqrt (2 / π) = 1 := by
+    rw [hs0, ← Real.sqrt_mul (by positivity), show (π / 2) * (2 / π) = 1 by field_simp, Real.sqrt_one]
+  -- orthogonal decomposition `q = ⟪u,q⟫ • u + w`
+  set w : EuclideanSpace ℝ (Fin d) := q - ⟪u, q⟫ • u with hw
+  have hperp : ⟪u, w⟫ = 0 := by
+    rw [hw, inner_sub_right, real_inner_smul_right, real_inner_self_eq_norm_sq, hu]; ring
+  have hqg : ∀ g : EuclideanSpace ℝ (Fin d), ⟪q, g⟫ = ⟪u, q⟫ * ⟪u, g⟫ + ⟪w, g⟫ := by
+    intro g; rw [hw, inner_sub_left, real_inner_smul_left]; ring
+  have hnw : ‖w‖ ^ 2 = ‖q‖ ^ 2 - ⟪u, q⟫ ^ 2 := by
+    rw [← real_inner_self_eq_norm_sq, hw]
+    simp only [inner_sub_left, inner_sub_right, real_inner_smul_left, real_inner_smul_right,
+      real_inner_self_eq_norm_sq, hu, real_inner_comm q u, norm_smul, Real.norm_eq_abs, mul_one,
+      sq_abs, one_pow]
+    ring
+  have hnq : ‖q‖ ^ 2 = ⟪u, q⟫ ^ 2 + ‖w‖ ^ 2 := by rw [hnw]; ring
+  -- the variance proxy of `b = ⟪w,g⟫`
+  set vw : ℝ≥0 := Real.toNNReal (‖w‖ ^ 2) with hvw
+  have hvwc : (vw : ℝ) = ‖w‖ ^ 2 := Real.coe_toNNReal _ (by positivity)
+  -- marginal laws of `a = ⟪u,g⟫` and `b = ⟪w,g⟫`
+  have hmapu : μ.map (fun g => ⟪u, g⟫) = gaussianReal 0 1 := by
+    have e : (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫) = ⇑(innerSL ℝ u) := by
+      funext g; rw [innerSL_apply_apply]
+    rw [e]
+    have hns : ‖innerSL ℝ u‖ ^ 2 = 1 := by rw [innerSL_apply_norm, hu]; norm_num
+    have hgl : HasGaussianLaw (⇑(innerSL ℝ u))
+        (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) :=
+      IsGaussian.hasGaussianLaw_id.map (innerSL ℝ u)
+    rw [hμ, hgl.map_eq_gaussianReal, integral_strongDual_stdGaussian (innerSL ℝ u),
+      variance_dual_stdGaussian (innerSL ℝ u), hns, Real.toNNReal_one]
+  have hmapw : μ.map (fun g => ⟪w, g⟫) = gaussianReal 0 vw := by
+    have e : (fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫) = ⇑(innerSL ℝ w) := by
+      funext g; rw [innerSL_apply_apply]
+    rw [e]
+    have hns : ‖innerSL ℝ w‖ ^ 2 = ‖w‖ ^ 2 := by rw [innerSL_apply_norm]
+    have hgl : HasGaussianLaw (⇑(innerSL ℝ w))
+        (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) :=
+      IsGaussian.hasGaussianLaw_id.map (innerSL ℝ w)
+    rw [hμ, hgl.map_eq_gaussianReal, integral_strongDual_stdGaussian (innerSL ℝ w),
+      variance_dual_stdGaussian (innerSL ℝ w), hns, hvw]
+  -- independence of `a` and `b` (orthogonal Gaussian functionals)
+  have haem_u : AEMeasurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫) μ :=
+    (by fun_prop : Measurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫)).aemeasurable
+  have haem_w : AEMeasurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫) μ :=
+    (by fun_prop : Measurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫)).aemeasurable
+  have hpair : HasGaussianLaw (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫)) μ := by
+    rw [hμ]
+    refine (IsGaussian.hasGaussianLaw_id.map ((innerSL ℝ u).prod (innerSL ℝ w))).congr ?_
+    filter_upwards with g
+    simp [Function.comp, ContinuousLinearMap.prod_apply, innerSL_apply_apply]
+  have hcov : cov[fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫,
+      fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫; μ] = 0 := by
+    rw [hμ, ← covarianceBilin_apply_eq_cov IsGaussian.memLp_two_id u w, covarianceBilin_stdGaussian]
+    exact hperp
+  have hindep : IndepFun (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫)
+      (fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫) μ :=
+    hpair.indepFun_of_covariance_eq_zero hcov
+  have hjoint : μ.map (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫))
+      = (gaussianReal 0 1).prod (gaussianReal 0 vw) := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map haem_u haem_w).mp hindep, hmapu, hmapw]
+  have hΦaem : AEMeasurable (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫)) μ :=
+    (by fun_prop :
+      Measurable (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫))).aemeasurable
+  -- the pushed-forward integrand on the product law
+  set G : ℝ × ℝ → ℝ := fun p => s0 * Real.sign p.1 * (⟪u, q⟫ * p.1 + p.2) - ⟪u, q⟫ with hG
+  have hGval : ∀ a b : ℝ, G (a, b) = s0 * Real.sign a * (⟪u, q⟫ * a + b) - ⟪u, q⟫ := fun _ _ => rfl
+  have hGmeas : Measurable G := by
+    refine Measurable.sub (Measurable.mul ?_ ?_) measurable_const
+    · exact measurable_const.mul (measurable_real_sign.comp measurable_fst)
+    · exact (measurable_const.mul measurable_fst).add measurable_snd
+  -- integrability of `exp(t·G)` on the product law, by a product domination
+  have hIntProd : ∀ t : ℝ, Integrable (fun p : ℝ × ℝ => rexp (t * G p))
+      ((gaussianReal 0 1).prod (gaussianReal 0 vw)) := by
+    intro t
+    set k : ℝ := |t| * s0 * |⟪u, q⟫| with hk
+    set k' : ℝ := |t| * s0 with hk'
+    have hdom : Integrable (fun p : ℝ × ℝ =>
+        (rexp (|t| * |⟪u, q⟫|) * (rexp (k * p.1) + rexp (-k * p.1)))
+          * (rexp (k' * p.2) + rexp (-k' * p.2)))
+        ((gaussianReal 0 1).prod (gaussianReal 0 vw)) :=
+      Integrable.mul_prod
+        (f := fun a : ℝ => rexp (|t| * |⟪u, q⟫|) * (rexp (k * a) + rexp (-k * a)))
+        (g := fun b : ℝ => rexp (k' * b) + rexp (-k' * b))
+        (((integrable_exp_mul_gaussianReal k).add
+          (integrable_exp_mul_gaussianReal (-k))).const_mul _)
+        ((integrable_exp_mul_gaussianReal k').add (integrable_exp_mul_gaussianReal (-k')))
+    refine hdom.mono' (hGmeas.const_mul t |>.exp.aestronglyMeasurable) ?_
+    filter_upwards with p
+    obtain ⟨a, b⟩ := p
+    rw [Real.norm_eq_abs, abs_of_nonneg (Real.exp_pos _).le]
+    have hsign : |Real.sign a| ≤ 1 := by
+      rcases Real.sign_apply_eq a with h | h | h <;> rw [h] <;> norm_num
+    have hsplit : t * G (a, b)
+        = t * s0 * Real.sign a * ⟪u, q⟫ * a + t * s0 * Real.sign a * b + (-(t * ⟪u, q⟫)) := by
+      rw [hGval a b]; ring
+    rw [hsplit, Real.exp_add, Real.exp_add]
+    have hA : rexp (t * s0 * Real.sign a * ⟪u, q⟫ * a) ≤ rexp (k * a) + rexp (-k * a) := by
+      have hbnd : t * s0 * Real.sign a * ⟪u, q⟫ * a ≤ k * |a| := by
+        calc t * s0 * Real.sign a * ⟪u, q⟫ * a
+            ≤ |t * s0 * Real.sign a * ⟪u, q⟫ * a| := le_abs_self _
+          _ = |t| * s0 * |Real.sign a| * |⟪u, q⟫| * |a| := by
+              rw [abs_mul, abs_mul, abs_mul, abs_mul, abs_of_nonneg hs0nn]
+          _ ≤ |t| * s0 * 1 * |⟪u, q⟫| * |a| := by gcongr
+          _ = k * |a| := by rw [hk]; ring
+      rcases le_or_gt 0 a with ha | ha
+      · rw [abs_of_nonneg ha] at hbnd
+        linarith [Real.exp_le_exp.mpr hbnd, (Real.exp_pos (-k * a)).le]
+      · rw [abs_of_neg ha] at hbnd
+        have hbnd' : t * s0 * Real.sign a * ⟪u, q⟫ * a ≤ -k * a := by rw [neg_mul]; linarith
+        linarith [Real.exp_le_exp.mpr hbnd', (Real.exp_pos (k * a)).le]
+    have hB : rexp (t * s0 * Real.sign a * b) ≤ rexp (k' * b) + rexp (-k' * b) := by
+      have hbnd : t * s0 * Real.sign a * b ≤ k' * |b| := by
+        calc t * s0 * Real.sign a * b
+            ≤ |t * s0 * Real.sign a * b| := le_abs_self _
+          _ = |t| * s0 * |Real.sign a| * |b| := by
+              rw [abs_mul, abs_mul, abs_mul, abs_of_nonneg hs0nn]
+          _ ≤ |t| * s0 * 1 * |b| := by gcongr
+          _ = k' * |b| := by rw [hk']; ring
+      rcases le_or_gt 0 b with hb | hb
+      · rw [abs_of_nonneg hb] at hbnd
+        linarith [Real.exp_le_exp.mpr hbnd, (Real.exp_pos (-k' * b)).le]
+      · rw [abs_of_neg hb] at hbnd
+        have hbnd' : t * s0 * Real.sign a * b ≤ -k' * b := by rw [neg_mul]; linarith
+        linarith [Real.exp_le_exp.mpr hbnd', (Real.exp_pos (k' * b)).le]
+    have hC : rexp (-(t * ⟪u, q⟫)) ≤ rexp (|t| * |⟪u, q⟫|) := by
+      apply Real.exp_le_exp.mpr
+      calc -(t * ⟪u, q⟫) ≤ |t * ⟪u, q⟫| := neg_le_abs _
+        _ = |t| * |⟪u, q⟫| := abs_mul _ _
+    calc rexp (t * s0 * Real.sign a * ⟪u, q⟫ * a) * rexp (t * s0 * Real.sign a * b)
+            * rexp (-(t * ⟪u, q⟫))
+        ≤ (rexp (k * a) + rexp (-k * a)) * (rexp (k' * b) + rexp (-k' * b))
+            * rexp (|t| * |⟪u, q⟫|) := by gcongr <;> positivity
+      _ = rexp (|t| * |⟪u, q⟫|) * (rexp (k * a) + rexp (-k * a))
+            * (rexp (k' * b) + rexp (-k' * b)) := by ring
+  -- the sub-Gaussian bound on the product law
+  have hGsub : HasSubgaussianMGF G ⟨π / 2 * ‖q‖ ^ 2, by positivity⟩
+      ((gaussianReal 0 1).prod (gaussianReal 0 vw)) := by
+    refine ⟨hIntProd, fun t => ?_⟩
+    show mgf G _ t ≤ rexp (π / 2 * ‖q‖ ^ 2 * t ^ 2 / 2)
+    rw [mgf, integral_prod _ (hIntProd t)]
+    -- integrate in `b` first
+    have hinner : ∀ a : ℝ, ∫ b, rexp (t * G (a, b)) ∂(gaussianReal 0 vw)
+        = rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+          * rexp ((vw : ℝ) * (t * s0 * Real.sign a) ^ 2 / 2) := by
+      intro a
+      have e : ∀ b : ℝ, rexp (t * G (a, b))
+          = rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+            * rexp ((t * s0 * Real.sign a) * b) := by
+        intro b
+        rw [hGval a b, ← Real.exp_add]
+        congr 1
+        rw [← sign_mul_self a]
+        linear_combination (t * ⟪u, q⟫) * hs0cc
+      simp_rw [e]
+      rw [integral_const_mul, gaussianReal_mgf_id]
+    simp_rw [hinner]
+    set K : ℝ := rexp ((vw : ℝ) * (t * s0) ^ 2 / 2) with hK
+    have hpt : ∀ a : ℝ,
+        rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+            * rexp ((vw : ℝ) * (t * s0 * Real.sign a) ^ 2 / 2)
+          ≤ rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π))) * K := by
+      intro a
+      apply mul_le_mul_of_nonneg_left _ (Real.exp_pos _).le
+      apply Real.exp_le_exp.mpr
+      have hsq1 : (Real.sign a) ^ 2 ≤ 1 := by
+        rcases Real.sign_apply_eq a with h | h | h <;> rw [h] <;> norm_num
+      have hvwnn : (0 : ℝ) ≤ (vw : ℝ) := vw.coe_nonneg
+      have heq : (t * s0 * Real.sign a) ^ 2 = (t * s0) ^ 2 * (Real.sign a) ^ 2 := by ring
+      rw [heq]
+      have hkey := mul_le_mul_of_nonneg_left hsq1 (mul_nonneg hvwnn (sq_nonneg (t * s0)))
+      nlinarith [hkey]
+    have hI2 : Integrable (fun a => rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π))) * K)
+        (gaussianReal 0 1) :=
+      (foldedNormal_subgaussian.integrable_exp_mul (t * s0 * ⟪u, q⟫)).mul_const K
+    have hI1 : Integrable (fun a => rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+        * rexp ((vw : ℝ) * (t * s0 * Real.sign a) ^ 2 / 2)) (gaussianReal 0 1) := by
+      refine hI2.mono' ?_ ?_
+      · refine (Measurable.mul ?_ ?_).aestronglyMeasurable
+        · exact measurable_exp.comp (by fun_prop)
+        · exact measurable_exp.comp
+            ((((measurable_const.mul measurable_real_sign).pow_const 2).const_mul (vw : ℝ)).div_const 2)
+      · filter_upwards with a
+        rw [Real.norm_eq_abs, abs_of_nonneg (by positivity)]
+        exact hpt a
+    calc ∫ a, rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+            * rexp ((vw : ℝ) * (t * s0 * Real.sign a) ^ 2 / 2) ∂(gaussianReal 0 1)
+        ≤ ∫ a, rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π))) * K ∂(gaussianReal 0 1) :=
+          integral_mono hI1 hI2 hpt
+      _ = (∫ a, rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π))) ∂(gaussianReal 0 1)) * K := by
+          rw [integral_mul_const]
+      _ ≤ rexp ((t * s0 * ⟪u, q⟫) ^ 2 / 2) * K := by
+          have hfold : (∫ a, rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π)))
+              ∂(gaussianReal 0 1)) ≤ rexp ((t * s0 * ⟪u, q⟫) ^ 2 / 2) := by
+            have h := foldedNormal_subgaussian.mgf_le (t * s0 * ⟪u, q⟫)
+            rw [mgf] at h
+            calc ∫ a, rexp (t * s0 * ⟪u, q⟫ * (|a| - Real.sqrt (2 / π))) ∂(gaussianReal 0 1)
+                ≤ rexp (1 * (t * s0 * ⟪u, q⟫) ^ 2 / 2) := h
+              _ = rexp ((t * s0 * ⟪u, q⟫) ^ 2 / 2) := by rw [one_mul]
+          have hKnn : (0 : ℝ) ≤ K := (Real.exp_pos _).le
+          exact mul_le_mul_of_nonneg_right hfold hKnn
+      _ = rexp (π / 2 * ‖q‖ ^ 2 * t ^ 2 / 2) := by
+          rw [hK, ← Real.exp_add]
+          congr 1
+          rw [hvwc, hnq]
+          linear_combination ((⟪u, q⟫ ^ 2 + ‖w‖ ^ 2) * t ^ 2 / 2) * hs0sq
+  -- transport back to `g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫`
+  have hofmap : HasSubgaussianMGF
+      (G ∘ (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫)))
+      ⟨π / 2 * ‖q‖ ^ 2, by positivity⟩ μ := by
+    apply HasSubgaussianMGF.of_map hΦaem
+    rw [hjoint]; exact hGsub
+  have htarget : (G ∘ (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪w, g⟫)))
+      = fun g => Real.sqrt (π / 2) * Real.sign (⟪u, g⟫) * ⟪q, g⟫ - ⟪u, q⟫ := by
+    funext g
+    simp only [Function.comp_apply, hGval]
+    rw [← hqg g, hs0]
+  rw [htarget] at hofmap
+  exact hofmap
 
 /-- **Centered estimator is sub-Gaussian.** Assuming the per-row sub-Gaussian MGF bound
 (`IsPerRowSubgaussian`), the centered estimator `qjlEstimator − ⟪key/‖key‖, q⟫` is sub-Gaussian with
