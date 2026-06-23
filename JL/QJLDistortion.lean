@@ -92,4 +92,41 @@ theorem qjl_perrow_variance_le {d : ℕ} (u q : EuclideanSpace ℝ (Fin d)) :
         integral_mono hmem.integrable_sq (memLp_inner q).integrable_sq hle
     _ = ‖q‖ ^ 2 := integral_inner_sq_stdGaussian q
 
+/-! ## Part 2: variance of the `m`-row estimator via cross-row independence -/
+
+/-- **Estimator variance bound.** Over an `m × d` i.i.d. standard-Gaussian sketch, the variance of
+the asymmetric 1-bit estimator is `≤ (π/2)‖q‖² / m`.
+
+The `m` per-row terms are i.i.d. functions of distinct coordinates of the product measure, so
+`ProbabilityTheory.variance_sum_pi` gives `Var[Σ row] = Σ Var[row] = m·Var[row]`; pulling out the
+`(√(π/2)/m)` scaling and applying the per-row bound finishes it. -/
+theorem qjlEstimator_variance_le {m d : ℕ} (hm : 0 < m)
+    (key q : EuclideanSpace ℝ (Fin d)) :
+    variance (fun S => qjlEstimator key q S)
+        (Measure.pi (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+      ≤ π / 2 * ‖q‖ ^ 2 / m := by
+  have hmne : (m : ℝ) ≠ 0 := Nat.cast_ne_zero.mpr hm.ne'
+  -- present the estimator as a constant times a coordinate-sum of i.i.d. per-row functions
+  have heq : (fun S : Fin m → EuclideanSpace ℝ (Fin d) => qjlEstimator key q S)
+      = fun S => (Real.sqrt (π / 2) * (m : ℝ)⁻¹) *
+          (∑ i, (fun ω : Fin m → EuclideanSpace ℝ (Fin d) =>
+            Real.sign (⟪‖key‖⁻¹ • key, ω i⟫) * ⟪q, ω i⟫)) S := by
+    funext S
+    simp only [qjlEstimator, Finset.sum_apply]
+    ring
+  rw [heq, variance_const_mul,
+    variance_sum_pi (fun _ : Fin m => memLp_sign_inner (‖key‖⁻¹ • key) q),
+    Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+  have hsq : (Real.sqrt (π / 2)) ^ 2 = π / 2 := Real.sq_sqrt (by positivity)
+  have hV := qjl_perrow_variance_le (‖key‖⁻¹ • key) q
+  calc (Real.sqrt (π / 2) * (m : ℝ)⁻¹) ^ 2 *
+          ((m : ℝ) * variance (fun g => Real.sign (⟪‖key‖⁻¹ • key, g⟫) * ⟪q, g⟫)
+            (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+      ≤ (Real.sqrt (π / 2) * (m : ℝ)⁻¹) ^ 2 * ((m : ℝ) * ‖q‖ ^ 2) := by
+        apply mul_le_mul_of_nonneg_left _ (by positivity)
+        exact mul_le_mul_of_nonneg_left hV (by positivity)
+    _ = π / 2 * ‖q‖ ^ 2 / m := by
+        rw [mul_pow, hsq]
+        field_simp
+
 end JL
