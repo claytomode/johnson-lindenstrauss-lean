@@ -79,3 +79,5 @@ end JL
 #print axioms JL.qjl_perrow_variance_le
 #print axioms JL.qjlEstimator_variance_le
 #print axioms JL.qjlEstimator_concentration
+#print axioms JL.qjlEstimator_centered_hasSubgaussianMGF
+#print axioms JL.qjlEstimator_concentration_exp

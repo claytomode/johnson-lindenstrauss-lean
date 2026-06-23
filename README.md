@@ -72,6 +72,23 @@ theorem qjlEstimator_concentration {m d : ℕ} (hm : 0 < m)
       ≤ π / 2 * ‖q‖ ^ 2 / (m * ε ^ 2)
 ```
 
+**QJL exponential distortion bound** (`JL/QJLDistortion.lean`) — the sub-Gaussian / Chernoff
+sharpening of the Chebyshev bound: the deviation probability decays *exponentially* in `m`, namely
+`2·exp(-m·ε²/(π·‖q‖²))`, so `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits suffice for additive error `ε` with
+probability `1 − δ`. This is the one result that depends on a single isolated hypothesis: the
+predicate `IsPerRowSubgaussian`, asserting that the centered per-row sign-product term has a
+sub-Gaussian MGF with variance proxy `(π/2)‖q‖²` (see "Scope / not yet done").
+
+```lean
+theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
+    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε)
+    (hsub : IsPerRowSubgaussian (‖key‖⁻¹ • key) q) :
+    (Measure.pi
+        (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
+        {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
+      ≤ 2 * Real.exp (-((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2))
+```
+
 ### Supporting results
 
 - `JL.sqGaussian_mgf` — `E[exp(t·Z²)] = (1−2t)^(−1/2)` for `Z ~ N(0,1)`, `t < 1/2`.
@@ -87,6 +104,9 @@ theorem qjlEstimator_concentration {m d : ℕ} (hm : 0 < m)
 - `JL.integral_abs_gaussianReal` — the Gaussian absolute moment `E|Z| = √(2/π)`.
 - `JL.qjl_perrow_variance_le` / `JL.qjlEstimator_variance_le` — per-row and `m`-row variance
   bounds (the latter via cross-row independence, `ProbabilityTheory.variance_sum_pi`).
+- `JL.qjlEstimator_centered_hasSubgaussianMGF` — the centered estimator is sub-Gaussian with
+  variance proxy `(π/2)‖q‖²/m`, assembled from the `m` independent rows (`iIndepFun_pi`,
+  `HasSubgaussianMGF.sum_of_iIndepFun`) and the `1/m` rescaling.
 
 ## Layout
 
@@ -128,13 +148,20 @@ only on mathlib's three standard axioms:
 ```
 
 There are no uses of `sorry`, `admit`, custom `axiom` declarations, or `native_decide` anywhere
-in the development.
+in the development. (The exponential distortion bound takes the per-row sub-Gaussian fact as an
+explicit hypothesis `IsPerRowSubgaussian` — see below — so it too reduces to the three axioms.)
 
 ## Scope / not yet done
 
-- **Exponential (sub-Gaussian) QJL tail.** Only the Chebyshev distortion bound is proven. A
-  sharper `exp(−c·m·ε²/‖q‖²)` tail would require establishing a sub-Gaussian MGF for the centered
-  `sign·Gaussian` per-row term (no domination shortcut exists in mathlib); this is future work.
+- **The one demoted step: `IsPerRowSubgaussian`.** The exponential QJL tail
+  (`qjlEstimator_concentration_exp`) is fully proven *except* for a single isolated, clearly-true
+  hypothesis: that the centered per-row term `g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫` has a sub-Gaussian
+  MGF with variance proxy `(π/2)‖q‖²`. Everything downstream — coordinate independence under
+  `Measure.pi`, additivity of the sub-Gaussian parameter over the `m` independent rows, the `1/m`
+  rescaling, and the two-sided Chernoff bound — is discharged unconditionally. A mathlib proof of
+  `IsPerRowSubgaussian` itself needs a folded-normal / `erf` sub-Gaussian estimate for `|⟪u,g⟫|`
+  that is not yet available (the crude `exp(t|x|) ≤ exp(tx)+exp(−tx)` bound loses a factor `2` per
+  row, fatal across `m` rows), so it is left as the remaining analytic gap.
 - **PolarQuant stage-1 MSE bound** and **full TurboQuant two-stage near-optimality** are out of
   scope here.
 - **Not upstreamed.** This lives as a standalone project, not (yet) part of mathlib. A few helper
