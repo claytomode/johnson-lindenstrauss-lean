@@ -9,9 +9,12 @@ probabilistic core is chi-squared concentration (the MGF of a sum of squared Gau
 mathlib's Chernoff bound); Gaussian rotation invariance transports it to the real random
 projection, and a union bound over pairs upgrades the per-vector guarantee to a single
 projection that preserves *all* pairwise distances. The QJL layer adds the
-Grothendieck/sign-product identity `E[sign⟨u,g⟩·⟨v,g⟩] = √(2/π)·⟨u,v⟩` and builds the
-unbiased estimator and its variance/Chebyshev tail on top of it. Everything reduces to
-mathlib's three standard axioms.
+asymmetric sign-product identity `E[sign⟨u,g⟩·⟨v,g⟩] = √(2/π)·⟨u,v⟩` (the one-sided one-bit
+analogue — *not* the symmetric Grothendieck arcsin law `E[sign⟨u,g⟩·sign⟨v,g⟩] = (2/π)·arcsin⟨u,v⟩`)
+and builds the unbiased estimator and its variance/Chebyshev tail on top of it. The
+unconditionally-proven distortion guarantee is the Chebyshev bound; an exponential sub-Gaussian
+sharpening is also proven, conditional on one isolated sub-Gaussian hypothesis. Everything reduces
+to mathlib's three standard axioms.
 
 ## Main results
 
@@ -30,9 +33,11 @@ theorem johnson_lindenstrauss_pointset {m d k : ℕ} (hk : 0 < k)
         < ε * ‖p a - p b‖ ^ 2
 ```
 
-**The Grothendieck / sign-product identity** (`JL/QJL.lean`) — for a standard Gaussian vector
+**The asymmetric sign-product identity** (`JL/QJL.lean`) — for a standard Gaussian vector
 `g` in `ℝ^d`, a unit vector `u` and an arbitrary `v`, the expected product of `sign⟨u,g⟩` with
-`⟨v,g⟩` is `√(2/π)·⟨u,v⟩`. This is the heart of QJL's 1-bit correctness.
+`⟨v,g⟩` is `√(2/π)·⟨u,v⟩`. This is the heart of QJL's 1-bit correctness. Note it is the
+*asymmetric* one-sided (linear) identity, **not** the symmetric Grothendieck arcsin identity
+`E[sign⟨u,g⟩·sign⟨v,g⟩] = (2/π)·arcsin⟨u,v⟩`.
 
 ```lean
 theorem sign_product_identity {d : ℕ} (u v : EuclideanSpace ℝ (Fin d)) (hu : ‖u‖ = 1) :
@@ -75,9 +80,13 @@ theorem qjlEstimator_concentration {m d : ℕ} (hm : 0 < m)
 **QJL exponential distortion bound** (`JL/QJLDistortion.lean`) — the sub-Gaussian / Chernoff
 sharpening of the Chebyshev bound: the deviation probability decays *exponentially* in `m`, namely
 `2·exp(-m·ε²/(π·‖q‖²))`, so `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits suffice for additive error `ε` with
-probability `1 − δ`. This is the one result that depends on a single isolated hypothesis: the
-predicate `IsPerRowSubgaussian`, asserting that the centered per-row sign-product term has a
-sub-Gaussian MGF with variance proxy `(π/2)‖q‖²` (see "Scope / not yet done").
+probability `1 − δ`. This exponential `log(1/δ)` form is what matches the QJL paper's published
+distortion guarantee (Lemma 3 of [arXiv:2406.03482](https://arxiv.org/abs/2406.03482)); the bound
+proven *unconditionally* in this project is instead the weaker Chebyshev one
+`m = O(‖q‖²/(ε²δ))` above. In other words, the sharp / published-strength tail is exactly the one
+resting on the `IsPerRowSubgaussian` hypothesis: a single isolated assumption that the centered
+per-row sign-product term has a sub-Gaussian MGF with variance proxy `(π/2)‖q‖²` (see
+"Scope / not yet done").
 
 ```lean
 theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)

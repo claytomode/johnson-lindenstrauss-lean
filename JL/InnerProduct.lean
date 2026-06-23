@@ -1,7 +1,7 @@
 import JL.NormPreservation
 
 /-!
-# Inner-product preservation (the QJL / TurboQuant tie-in)
+# Inner-product preservation (unquantized Gaussian-projection corollary)
 
 Via the polarization identity `⟪u, v⟫ = (‖u+v‖² - ‖u-v‖²)/4`, a *linear* map that
 preserves the squared norms of `u+v` and `u-v` to within a relative error `ε` also
@@ -9,10 +9,12 @@ preserves the inner product `⟪u, v⟫`:
 
 `|⟪f u, f v⟫ - ⟪u, v⟫| ≤ ε · (‖u‖² + ‖v‖²) / 2`.
 
-This is the algebraic corollary underpinning quantized Johnson–Lindenstrauss schemes
-(QJL / TurboQuant): combined with the distributional norm-preservation bound applied
-to `u+v` and `u-v`, the Gaussian projection preserves inner products with high
-probability.
+This is the *unquantized* inner-product corollary of full-precision Gaussian Johnson–Lindenstrauss:
+combined with the distributional norm-preservation bound applied to `u+v` and `u-v`, the Gaussian
+projection preserves inner products with high probability. It is the Dasgupta–Gupta baseline that
+quantized schemes (QJL / TurboQuant) are motivated by and compared against — it is *not* the
+mechanism behind QJL's one-bit guarantee, which instead rests on the asymmetric sign-product
+identity (`JL/QJL.lean`).
 -/
 
 open scoped RealInnerProductSpace

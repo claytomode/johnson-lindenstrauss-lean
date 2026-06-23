@@ -9,9 +9,11 @@ one-bit key quantization. It is built in three increasing layers:
 1. **Gaussian absolute moment** (`integral_abs_gaussianReal`):
    `E|Z| = √(2/π)` for `Z ~ N(0,1)`.
 
-2. **The Grothendieck / sign-product identity** (`sign_product_identity`): for a standard
+2. **The asymmetric sign-product identity** (`sign_product_identity`): for a standard
    Gaussian vector `g` in `ℝ^d`, a unit vector `u`, and an arbitrary `v`,
    `E[ sign ⟪u,g⟫ · ⟪v,g⟫ ] = √(2/π) · ⟪u,v⟫`.
+   This is the asymmetric one-bit (one-sided, linear) analogue; it is *not* the symmetric
+   Grothendieck arcsin identity `E[ sign ⟪u,g⟫ · sign ⟪v,g⟫ ] = (2/π)·arcsin ⟪u,v⟫`.
    The proof decomposes `v = ⟪u,v⟫·u + v⊥` with `v⊥ ⟂ u`, uses that `⟪v⊥,g⟫` is
    *independent* of `⟪u,g⟫` (orthogonal linear functionals of a standard Gaussian are
    independent, via `HasGaussianLaw.indepFun_of_covariance_eq_zero`), and that the cross term
@@ -106,7 +108,7 @@ theorem integral_abs_gaussianReal :
     _ = Real.sqrt ((Real.sqrt (2 / π)) ^ 2) := by rw [key]
     _ = Real.sqrt (2 / π) := Real.sqrt_sq hR
 
-/-! ## Part 2: the Grothendieck / sign-product identity -/
+/-! ## Part 2: the asymmetric sign-product identity -/
 
 /-- Integrability of a Gaussian linear functional `g ↦ ⟪w, g⟫`. -/
 theorem integrable_inner_stdGaussian {d : ℕ} (w : EuclideanSpace ℝ (Fin d)) :
@@ -119,9 +121,12 @@ theorem integrable_inner_stdGaussian {d : ℕ} (w : EuclideanSpace ℝ (Fin d)) 
   filter_upwards with g
   simp [innerSL_apply_apply]
 
-/-- **Grothendieck / sign-product identity.** For a standard Gaussian vector `g` in `ℝ^d`,
+/-- **Asymmetric sign-product identity.** For a standard Gaussian vector `g` in `ℝ^d`,
 a unit vector `u` and an arbitrary `v`,
 `E[ sign ⟪u,g⟫ · ⟪v,g⟫ ] = √(2/π) · ⟪u,v⟫`.
+
+This is the asymmetric one-bit (one-sided, linear) identity; it is *not* the symmetric
+Grothendieck arcsin identity `E[ sign ⟪u,g⟫ · sign ⟪v,g⟫ ] = (2/π)·arcsin ⟪u,v⟫`.
 
 The proof writes `v = ⟪u,v⟫·u + v⊥` with `v⊥ ⟂ u`. The `v⊥` part contributes
 `E[ sign ⟪u,g⟫ · ⟪v⊥,g⟫ ] = E[sign ⟪u,g⟫]·E[⟪v⊥,g⟫] = 0` because the two orthogonal linear
