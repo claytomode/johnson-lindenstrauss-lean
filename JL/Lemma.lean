@@ -31,7 +31,7 @@ theorem exists_avoiding {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω}
     (hsum : ∑ i ∈ s, μ.real (B i) < 1) :
     ∃ ω, ∀ i ∈ s, ω ∉ B i := by
   by_contra hcon
-  push_neg at hcon
+  push Not at hcon
   have hcover : (Set.univ : Set Ω) ⊆ ⋃ i ∈ s, B i := by
     intro ω _
     obtain ⟨i, hi, hω⟩ := hcon ω
