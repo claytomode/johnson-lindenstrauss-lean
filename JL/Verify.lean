@@ -60,15 +60,15 @@ example {d k : ℕ} (hk : 0 < k) (p : Fin 0 → EuclideanSpace ℝ (Fin d)) :
       nlinarith [hkR])
 
 /-- The exponential (sub-Gaussian) QJL distortion bound is now **unconditional**: it no longer
-requires the `IsPerRowSubgaussian` hypothesis, which is discharged by
-`isPerRowSubgaussian_normalized`. -/
-example {m d : ℕ} (hm : 0 < m) (key q : EuclideanSpace ℝ (Fin d)) (hkey : key ≠ 0)
+requires the `IsPerRowSubgaussian` hypothesis (discharged by `isPerRowSubgaussian_normalized`),
+nor any `key ≠ 0` assumption (the `key = 0` case holds trivially). -/
+example {m d : ℕ} (hm : 0 < m) (key q : EuclideanSpace ℝ (Fin d))
     {ε : ℝ} (hε : 0 < ε) :
     (Measure.pi
         (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
         {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
       ≤ 2 * rexp (-((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2)) :=
-  qjlEstimator_concentration_exp hm key q hkey hε
+  qjlEstimator_concentration_exp hm key q hε
 
 end JL
 

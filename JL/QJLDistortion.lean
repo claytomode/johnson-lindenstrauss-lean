@@ -251,7 +251,7 @@ theorem isPerRowSubgaussian_of_unit {d : ℕ} (u q : EuclideanSpace ℝ (Fin d))
     rw [← real_inner_self_eq_norm_sq, hw]
     simp only [inner_sub_left, inner_sub_right, real_inner_smul_left, real_inner_smul_right,
       real_inner_self_eq_norm_sq, hu, real_inner_comm q u, norm_smul, Real.norm_eq_abs, mul_one,
-      sq_abs, one_pow]
+      sq_abs]
     ring
   have hnq : ‖q‖ ^ 2 = ⟪u, q⟫ ^ 2 + ‖w‖ ^ 2 := by rw [hnw]; ring
   -- the variance proxy of `b = ⟪w,g⟫`
@@ -369,7 +369,7 @@ theorem isPerRowSubgaussian_of_unit {d : ℕ} (u q : EuclideanSpace ℝ (Fin d))
     calc rexp (t * s0 * Real.sign a * ⟪u, q⟫ * a) * rexp (t * s0 * Real.sign a * b)
             * rexp (-(t * ⟪u, q⟫))
         ≤ (rexp (k * a) + rexp (-k * a)) * (rexp (k' * b) + rexp (-k' * b))
-            * rexp (|t| * |⟪u, q⟫|) := by gcongr <;> positivity
+            * rexp (|t| * |⟪u, q⟫|) := by gcongr
       _ = rexp (|t| * |⟪u, q⟫|) * (rexp (k * a) + rexp (-k * a))
             * (rexp (k' * b) + rexp (-k' * b)) := by ring
   -- the sub-Gaussian bound on the product law
@@ -468,7 +468,7 @@ theorem isPerRowSubgaussian_normalized {d : ℕ} (key q : EuclideanSpace ℝ (Fi
   · subst hkey
     rw [smul_zero]
     refine HasSubgaussianMGF.congr (X := fun _ => (0 : ℝ)) ?_ ?_
-    · refine ⟨fun t => by simpa using integrable_const (1 : ℝ), fun t => ?_⟩
+    · refine ⟨fun t => by simp, fun t => ?_⟩
       have hmgf : mgf (fun _ : EuclideanSpace ℝ (Fin d) => (0 : ℝ))
           (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) t = 1 := by
         rw [mgf]; simp
@@ -555,7 +555,7 @@ most
 bound `qjlEstimator_concentration`. Hence `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits suffice for additive
 error `ε` with probability `1 − δ`. -/
 theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
-    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε) :
+    (key q : EuclideanSpace ℝ (Fin d)) {ε : ℝ} (hε : 0 < ε) :
     (Measure.pi
         (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
         {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}

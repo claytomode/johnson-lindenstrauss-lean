@@ -90,7 +90,7 @@ on (formerly an `IsPerRowSubgaussian` hypothesis) is now proven from scratch as
 
 ```lean
 theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
-    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε) :
+    (key q : EuclideanSpace ℝ (Fin d)) {ε : ℝ} (hε : 0 < ε) :
     (Measure.pi
         (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
         {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
