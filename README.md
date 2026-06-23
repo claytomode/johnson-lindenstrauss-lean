@@ -17,6 +17,48 @@ are proven fully unconditionally; the latter rests on a folded-normal sub-Gaussi
 from scratch in `JL/GaussianTail.lean` (mathlib lacks `erf` / Gaussian-CDF concentration).
 Everything reduces to mathlib's three standard axioms.
 
+## How to read this (you don't need to know Lean)
+
+If you are evaluating whether these results are *the* results you proved on paper, you only ever
+need to read the **theorem statements** — never the proof bodies.
+
+- **You do not need to trust, or even read, the proofs.** Lean's kernel mechanically checks every
+  proof step. A theorem that the build accepts is, by construction, a correct derivation from its
+  hypotheses; correctness of the proof is not a matter of trust or careful human review.
+- **Three checks rule out anything faked**, and this repo performs all three: (1) the project
+  *builds cleanly*; (2) there is *zero* `sorry`/`admit` (no proof is left as an unproven hole);
+  and (3) `#print axioms` on every headline theorem reports only Lean/mathlib's three standard
+  foundational axioms — `propext`, `Classical.choice`, `Quot.sound` — i.e. no extra assumptions or
+  escape hatches were smuggled in. The audit lives in `JL/Verify.lean`.
+- **So the only thing that needs your expertise** is the question *"does this Lean statement say
+  what my lemma says?"* The table below answers exactly that: it maps each Lean theorem to its
+  plain-math meaning and to the corresponding paper lemma, so you can spot-check the statements in a
+  couple of minutes.
+- You can read every file directly on GitHub in your browser — no need to install Lean or build
+  anything. The build instructions further down are only for those who want to re-verify locally.
+
+## Theorem ↔ paper-lemma map
+
+Each row is a headline result; the statement column is plain math (read the file for the exact Lean
+syntax). `g` is a standard Gaussian vector, the sketch is `m × d` i.i.d. standard Gaussian, and
+`estimator` is the asymmetric 1-bit QJL estimator `qjlEstimator`.
+
+| Lean name | File | Plain-math statement | Corresponds to |
+| --- | --- | --- | --- |
+| `qjlEstimator_unbiased` / `qjlEstimator_unbiased_inner` | `JL/QJL.lean` | `E[estimator] = ⟨key/‖key‖, q⟩`; un-normalized, `‖key‖·E[estimator] = ⟨key, q⟩`. Expectation over the `m × d` i.i.d. standard-Gaussian sketch; requires `key ≠ 0`. | **QJL Lemma 2** — unbiasedness of the asymmetric one-bit estimator. |
+| `qjlEstimator_concentration` | `JL/QJLDistortion.lean` | `P(\|estimator − ⟨key/‖key‖,q⟩\| ≥ ε) ≤ (π/2)·‖q‖²/(m·ε²)`. | **Chebyshev** (second-moment) distortion bound. |
+| `qjlEstimator_concentration_exp` | `JL/QJLDistortion.lean` | `P(\|estimator − ⟨key/‖key‖,q⟩\| ≥ ε) ≤ 2·exp(−m·ε²/(π·‖q‖²))`, fully unconditional (no `key ≠ 0` needed). | **Same FORM as QJL Lemma 3** (exponential, `log(1/δ)` / `ε⁻²` rate) — but with a **looser explicit constant**: `π ≈ 3.14` here in place of the paper's `(4/3)(1+ε) ≈ 1.33–2.67`. The rate matches; the constant is *not* identical (it is looser). |
+| `sign_product_identity` | `JL/QJL.lean` | for a **unit** `u` (`‖u‖ = 1`): `E[sign⟨u,g⟩·⟨v,g⟩] = √(2/π)·⟨u,v⟩` — the asymmetric one-bit sign-product identity (distinct from the symmetric Grothendieck arcsin law). | Supporting identity behind Lemma 2. |
+| `integral_abs_gaussianReal` | `JL/QJL.lean` | `E\|Z\| = √(2/π)` for `Z ~ N(0,1)`. | Supporting Gaussian moment. |
+| `foldedNormal_subgaussian` | `JL/GaussianTail.lean` | `\|Z\| − √(2/π)` is 1-sub-Gaussian for `Z ~ N(0,1)`. | From-scratch infrastructure filling a mathlib gap (no `erf` / Gaussian-CDF concentration); this is what makes the exponential bound unconditional. |
+| `johnson_lindenstrauss_pointset` | `JL/EndToEnd.lean` | for `m` distinct points and `0 < ε < 1`, if `4·log(2m²) < (ε²−ε³)·k` then there **exists** one linear map (the `1/√k`-scaled Gaussian projection `jlMap`) preserving **all** pairwise squared distances within relative error `ε`. The dimension condition yields `k = Θ(ε⁻² log m)`, the standard JL target dimension — derived, not assumed. | **The Johnson–Lindenstrauss lemma** (pointset / distance-preservation form). |
+| `johnson_lindenstrauss` | `JL/Lemma.lean` | abstract probabilistic-method / union-bound existence theorem that the pointset version is built on. | JL via the probabilistic method. |
+| `inner_product_preservation` | `JL/InnerProduct.lean` | **deterministic** polarization corollary: **if** a linear map `f` preserves `‖u±v‖²` within relative error `ε`, **then** `\|⟨f u, f v⟩ − ⟨u, v⟩\| ≤ ε·(‖u‖²+‖v‖²)/2`. This is a deterministic corollary *conditional on* the norm-preservation hypotheses — **not** an assembled probabilistic guarantee about `jlMap`. | JL inner-product preservation. |
+
+**Scope (what is and isn't here).** This formalizes the QJL one-bit inner-product layer plus the JL
+foundations only. The PolarQuant stage-1 MSE bound, the full two-stage TurboQuant estimator, and the
+information-theoretic lower bound are **not** formalized (see *Scope / not yet done* below).
+
 ## Main results
 
 **End-to-end Johnson–Lindenstrauss** (`JL/EndToEnd.lean`) — for any `m` distinct points and any
