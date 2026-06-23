@@ -106,4 +106,96 @@ theorem integral_abs_gaussianReal :
     _ = Real.sqrt ((Real.sqrt (2 / π)) ^ 2) := by rw [key]
     _ = Real.sqrt (2 / π) := Real.sqrt_sq hR
 
+/-! ## Part 2: the Grothendieck / sign-product identity -/
+
+/-- Integrability of a Gaussian linear functional `g ↦ ⟪w, g⟫`. -/
+theorem integrable_inner_stdGaussian {d : ℕ} (w : EuclideanSpace ℝ (Fin d)) :
+    Integrable (fun g : EuclideanSpace ℝ (Fin d) => ⟪w, g⟫)
+      (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) := by
+  have hgl : HasGaussianLaw (⇑(innerSL ℝ w))
+      (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) :=
+    IsGaussian.hasGaussianLaw_id.map (innerSL ℝ w)
+  refine hgl.integrable.congr ?_
+  filter_upwards with g
+  simp [innerSL_apply_apply]
+
+/-- **Grothendieck / sign-product identity.** For a standard Gaussian vector `g` in `ℝ^d`,
+a unit vector `u` and an arbitrary `v`,
+`E[ sign ⟪u,g⟫ · ⟪v,g⟫ ] = √(2/π) · ⟪u,v⟫`.
+
+The proof writes `v = ⟪u,v⟫·u + v⊥` with `v⊥ ⟂ u`. The `v⊥` part contributes
+`E[ sign ⟪u,g⟫ · ⟪v⊥,g⟫ ] = E[sign ⟪u,g⟫]·E[⟪v⊥,g⟫] = 0` because the two orthogonal linear
+functionals are independent (`HasGaussianLaw.indepFun_of_covariance_eq_zero`) and `E⟪v⊥,g⟫ = 0`;
+the `u` part contributes `⟪u,v⟫·E|⟪u,g⟫| = ⟪u,v⟫·√(2/π)`. -/
+theorem sign_product_identity {d : ℕ} (u v : EuclideanSpace ℝ (Fin d)) (hu : ‖u‖ = 1) :
+    ∫ g, Real.sign (⟪u, g⟫) * ⟪v, g⟫ ∂(ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))
+      = Real.sqrt (2 / π) * ⟪u, v⟫ := by
+  classical
+  set μ : Measure (EuclideanSpace ℝ (Fin d)) :=
+    ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)) with hμ
+  set vp : EuclideanSpace ℝ (Fin d) := v - ⟪u, v⟫ • u with hvp
+  -- `⟪u, v⊥⟫ = 0`.
+  have hperp : ⟪u, vp⟫ = 0 := by
+    rw [hvp, inner_sub_right, real_inner_smul_right, real_inner_self_eq_norm_sq, hu]
+    ring
+  -- pointwise decomposition of the integrand
+  have hpt : ∀ g : EuclideanSpace ℝ (Fin d), Real.sign (⟪u, g⟫) * ⟪v, g⟫
+      = ⟪u, v⟫ * |⟪u, g⟫| + Real.sign (⟪u, g⟫) * ⟪vp, g⟫ := by
+    intro g
+    have hvg : ⟪v, g⟫ = ⟪u, v⟫ * ⟪u, g⟫ + ⟪vp, g⟫ := by
+      rw [hvp, inner_sub_left, real_inner_smul_left]; ring
+    rw [hvg, show Real.sign (⟪u, g⟫) * (⟪u, v⟫ * ⟪u, g⟫ + ⟪vp, g⟫)
+        = ⟪u, v⟫ * (Real.sign (⟪u, g⟫) * ⟪u, g⟫) + Real.sign (⟪u, g⟫) * ⟪vp, g⟫ from by ring,
+      sign_mul_self]
+  -- `E|⟪u,g⟫| = √(2/π)`.
+  have habs : ∫ g, |⟪u, g⟫| ∂μ = √(2 / π) := by
+      have hns : ‖innerSL ℝ u‖ ^ 2 = 1 := by rw [innerSL_apply_norm, hu]; norm_num
+      have hgl : HasGaussianLaw (⇑(innerSL ℝ u))
+          (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) :=
+        IsGaussian.hasGaussianLaw_id.map (innerSL ℝ u)
+      have hmap' : μ.map (⇑(innerSL ℝ u)) = gaussianReal 0 1 := by
+        rw [hμ, hgl.map_eq_gaussianReal,
+          integral_strongDual_stdGaussian (innerSL ℝ u),
+          variance_dual_stdGaussian (innerSL ℝ u), hns, Real.toNNReal_one]
+      have e2 : ∫ g, |⟪u, g⟫| ∂μ = ∫ g, |(innerSL ℝ u) g| ∂μ := by
+        simp only [innerSL_apply_apply]
+      rw [e2, ← integral_abs_gaussianReal, ← hmap',
+        integral_map (by fun_prop) (by fun_prop : AEStronglyMeasurable (fun x : ℝ => |x|) _)]
+  -- The cross term `E[sign ⟪u,g⟫ · ⟪v⊥,g⟫] = 0`.
+  have hWzero : ∫ g, ⟪vp, g⟫ ∂μ = 0 := by
+    have h := integral_strongDual_stdGaussian (innerSL ℝ vp)
+    rw [hμ]; simpa [innerSL_apply_apply] using h
+  have hSignAE : AEStronglyMeasurable (fun g : EuclideanSpace ℝ (Fin d) => Real.sign (⟪u, g⟫)) μ :=
+    (measurable_real_sign.comp
+      (by fun_prop : Measurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫))).aestronglyMeasurable
+  have hSignInt : Integrable (fun g : EuclideanSpace ℝ (Fin d) => Real.sign (⟪u, g⟫)) μ := by
+    refine Integrable.mono' (integrable_const (1 : ℝ)) hSignAE ?_
+    filter_upwards with g
+    rcases Real.sign_apply_eq (⟪u, g⟫) with h | h | h <;> rw [h] <;> norm_num
+  have hpair : HasGaussianLaw (fun g : EuclideanSpace ℝ (Fin d) => (⟪u, g⟫, ⟪vp, g⟫)) μ := by
+    rw [hμ]
+    refine (IsGaussian.hasGaussianLaw_id.map ((innerSL ℝ u).prod (innerSL ℝ vp))).congr ?_
+    filter_upwards with g
+    simp [Function.comp, ContinuousLinearMap.prod_apply, innerSL_apply_apply]
+  have hcov : cov[fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫,
+      fun g : EuclideanSpace ℝ (Fin d) => ⟪vp, g⟫; μ] = 0 := by
+    rw [hμ, ← covarianceBilin_apply_eq_cov IsGaussian.memLp_two_id u vp, covarianceBilin_stdGaussian]
+    exact hperp
+  have hind : IndepFun (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫)
+      (fun g : EuclideanSpace ℝ (Fin d) => ⟪vp, g⟫) μ :=
+    hpair.indepFun_of_covariance_eq_zero hcov
+  have hindS : IndepFun (fun g : EuclideanSpace ℝ (Fin d) => Real.sign (⟪u, g⟫))
+      (fun g : EuclideanSpace ℝ (Fin d) => ⟪vp, g⟫) μ :=
+    hind.comp measurable_real_sign measurable_id
+  have hcross : ∫ g, Real.sign (⟪u, g⟫) * ⟪vp, g⟫ ∂μ = 0 := by
+    rw [hindS.integral_fun_mul_eq_mul_integral hSignAE
+        (integrable_inner_stdGaussian vp).aestronglyMeasurable, hWzero, mul_zero]
+  -- assemble
+  have hI1 : Integrable (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, v⟫ * |⟪u, g⟫|) μ :=
+    ((integrable_inner_stdGaussian u).abs).const_mul _
+  have hI2 : Integrable (fun g : EuclideanSpace ℝ (Fin d) => Real.sign (⟪u, g⟫) * ⟪vp, g⟫) μ :=
+    hindS.integrable_mul hSignInt (integrable_inner_stdGaussian vp)
+  rw [integral_congr_ae (Filter.Eventually.of_forall hpt), integral_add hI1 hI2,
+    integral_const_mul, habs, hcross, add_zero, mul_comm]
+
 end JL
