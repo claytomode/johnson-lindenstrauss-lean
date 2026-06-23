@@ -1,0 +1,53 @@
+import JL.SquaredGaussian
+import JL.ChiSquared
+import JL.Projection
+import JL.NormPreservation
+import JL.Lemma
+import JL.InnerProduct
+
+/-!
+# Verification: sanity instantiations and axiom audit
+
+This file contains small `example`-level sanity checks instantiating the main
+results, plus `#print axioms` commands confirming the development depends only on
+mathlib's standard axioms (`propext`, `Classical.choice`, `Quot.sound`) — i.e. it is
+genuinely `sorry`-free.
+-/
+
+open MeasureTheory ProbabilityTheory Real
+
+namespace JL
+
+/-- At `t = 0` the squared-Gaussian MGF is `1` (the total mass of `N(0,1)`). -/
+example : mgf (fun x => x ^ 2) stdGaussian 0 = 1 := by
+  rw [sqGaussian_mgf (by norm_num)]; norm_num
+
+/-- The chi-squared MGF specialises to the squared-Gaussian MGF at `k = 1`. -/
+example {t : ℝ} (ht : t < 1 / 2) :
+    mgf (chiSq 1) (gaussianVec 1) t = (√(1 - 2 * t))⁻¹ := by
+  rw [chiSq_mgf 1 ht, pow_one]
+
+/-- A concrete two-sided concentration instance: `k = 100`, `ε = 1/2`. -/
+example :
+    (gaussianVec 100).real
+        {ω | (1 + (1 / 2 : ℝ)) * (100 : ℝ) ≤ chiSq 100 ω
+              ∨ chiSq 100 ω ≤ (1 - (1 / 2 : ℝ)) * (100 : ℝ)}
+      ≤ 2 * rexp (-((1 / 2 : ℝ) ^ 2 - (1 / 2 : ℝ) ^ 3) * (100 : ℝ) / 4) :=
+  chiSq_concentration 100 (by norm_num) (by norm_num)
+
+/-- The JL existence theorem is vacuously instantiable on the empty point set. -/
+example {Ω : Type} [MeasurableSpace Ω] (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (r : Fin 0 → Fin 0 → Ω → ℝ) (D : Fin 0 → Fin 0 → ℝ) :
+    ∃ ω, ∀ a b : Fin 0, a ≠ b → |r a b ω - D a b| < (1 / 2 : ℝ) * D a b :=
+  johnson_lindenstrauss (μ := μ) (C := 0) r D (fun a => a.elim0) le_rfl (by norm_num)
+
+end JL
+
+-- Axiom audit for the main results.
+#print axioms JL.sqGaussian_mgf
+#print axioms JL.chiSq_mgf
+#print axioms JL.chiSq_upper_tail
+#print axioms JL.chiSq_lower_tail
+#print axioms JL.chiSq_concentration
+#print axioms JL.johnson_lindenstrauss
+#print axioms JL.inner_product_preservation

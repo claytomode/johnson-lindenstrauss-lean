@@ -4,3 +4,4 @@ import JL.Projection
 import JL.NormPreservation
 import JL.Lemma
 import JL.InnerProduct
+import JL.Verify
