@@ -1,1 +1,1 @@
-import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
+import JL.SquaredGaussian
