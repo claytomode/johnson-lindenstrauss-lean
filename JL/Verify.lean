@@ -2,7 +2,9 @@ import JL.SquaredGaussian
 import JL.ChiSquared
 import JL.Projection
 import JL.NormPreservation
+import JL.Rotation
 import JL.Lemma
+import JL.EndToEnd
 import JL.InnerProduct
 
 /-!
@@ -41,6 +43,19 @@ example {Ω : Type} [MeasurableSpace Ω] (μ : Measure Ω) [IsProbabilityMeasure
     ∃ ω, ∀ a b : Fin 0, a ≠ b → |r a b ω - D a b| < (1 / 2 : ℝ) * D a b :=
   johnson_lindenstrauss (μ := μ) (C := 0) r D (fun a => a.elim0) le_rfl (by norm_num)
 
+/-- The end-to-end Gaussian JL theorem is vacuously instantiable on the empty point set. -/
+example {d k : ℕ} (hk : 0 < k) (p : Fin 0 → EuclideanSpace ℝ (Fin d)) :
+    ∃ A : Fin k → Fin d → ℝ, ∀ a b : Fin 0, a ≠ b →
+      |(∑ i, (jlMap k d A (fun j => (p a - p b) j) i) ^ 2) - ‖p a - p b‖ ^ 2|
+        < (1 / 2 : ℝ) * ‖p a - p b‖ ^ 2 :=
+  johnson_lindenstrauss_pointset hk p (by norm_num) (by norm_num)
+    (fun a => a.elim0)
+    (by
+      have hkR : (0 : ℝ) < (k : ℝ) := by exact_mod_cast hk
+      simp only [Nat.cast_zero, ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, zero_pow,
+        mul_zero, Real.log_zero]
+      nlinarith [hkR])
+
 end JL
 
 -- Axiom audit for the main results.
@@ -49,5 +64,9 @@ end JL
 #print axioms JL.chiSq_upper_tail
 #print axioms JL.chiSq_lower_tail
 #print axioms JL.chiSq_concentration
+#print axioms JL.map_dotProduct_gaussianReal
+#print axioms JL.gaussianMatrix_map_dotProduct
+#print axioms JL.jlMap_concentration
 #print axioms JL.johnson_lindenstrauss
+#print axioms JL.johnson_lindenstrauss_pointset
 #print axioms JL.inner_product_preservation
