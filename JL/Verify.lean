@@ -7,6 +7,7 @@ import JL.Lemma
 import JL.EndToEnd
 import JL.InnerProduct
 import JL.QJL
+import JL.QJLDistortion
 
 /-!
 # Verification: sanity instantiations and axiom audit
@@ -75,3 +76,6 @@ end JL
 #print axioms JL.sign_product_identity
 #print axioms JL.qjlEstimator_unbiased
 #print axioms JL.qjlEstimator_unbiased_inner
+#print axioms JL.qjl_perrow_variance_le
+#print axioms JL.qjlEstimator_variance_le
+#print axioms JL.qjlEstimator_concentration

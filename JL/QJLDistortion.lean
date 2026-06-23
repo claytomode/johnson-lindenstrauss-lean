@@ -129,4 +129,54 @@ theorem qjlEstimator_variance_le {m d : ℕ} (hm : 0 < m)
         rw [mul_pow, hsq]
         field_simp
 
+/-! ## Part 3: Chebyshev distortion / concentration bound -/
+
+/-- The estimator is in `L²` under the product measure (a constant times a finite sum of i.i.d.
+per-row terms, each `L²`). -/
+theorem qjlEstimator_memLp {m d : ℕ} (key q : EuclideanSpace ℝ (Fin d)) :
+    MemLp (fun S => qjlEstimator key q S) 2
+      (Measure.pi (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))) := by
+  have heq : (fun S : Fin m → EuclideanSpace ℝ (Fin d) => qjlEstimator key q S)
+      = fun S => (Real.sqrt (π / 2) * (m : ℝ)⁻¹) *
+          ∑ i, Real.sign (⟪‖key‖⁻¹ • key, S i⟫) * ⟪q, S i⟫ := by
+    funext S
+    simp only [qjlEstimator]
+    ring
+  rw [heq]
+  refine MemLp.const_mul ?_ _
+  exact memLp_finsetSum Finset.univ (fun i _ =>
+    (memLp_sign_inner (‖key‖⁻¹ • key) q).comp_measurePreserving
+      (measurePreserving_eval
+        (μ := fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) i))
+
+/-- **QJL distortion / concentration bound (Chebyshev).** With `m` sign-bits, the asymmetric 1-bit
+estimator deviates from the true normalized inner product `⟪key/‖key‖, q⟫` by at least `ε` with
+probability at most `(π/2)‖q‖² / (m·ε²)`. Hence `m = O(‖q‖²/(ε²δ))` sign-bits suffice for additive
+error `ε` with probability `1 − δ`. -/
+theorem qjlEstimator_concentration {m d : ℕ} (hm : 0 < m)
+    (key q : EuclideanSpace ℝ (Fin d)) (hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε) :
+    (Measure.pi
+        (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
+        {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
+      ≤ π / 2 * ‖q‖ ^ 2 / (m * ε ^ 2) := by
+  have hmean : (Measure.pi
+      (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))[
+        fun S => qjlEstimator key q S] = ⟪‖key‖⁻¹ • key, q⟫ :=
+    qjlEstimator_unbiased hm key q hkey
+  have hCheb := meas_ge_le_variance_div_sq (qjlEstimator_memLp (m := m) key q) hε
+  rw [hmean] at hCheb
+  rw [measureReal_def]
+  calc (Measure.pi
+        (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))
+        {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}).toReal
+      ≤ (ENNReal.ofReal (variance (fun S => qjlEstimator key q S)
+          (Measure.pi (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+            / ε ^ 2)).toReal := ENNReal.toReal_mono (by finiteness) hCheb
+    _ = variance (fun S => qjlEstimator key q S)
+          (Measure.pi (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+            / ε ^ 2 := ENNReal.toReal_ofReal (div_nonneg (variance_nonneg _ _) (by positivity))
+    _ ≤ (π / 2 * ‖q‖ ^ 2 / m) / ε ^ 2 :=
+        (div_le_div_iff_of_pos_right (by positivity)).mpr (qjlEstimator_variance_le hm key q)
+    _ = π / 2 * ‖q‖ ^ 2 / (m * ε ^ 2) := by rw [div_div]
+
 end JL

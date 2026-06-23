@@ -7,4 +7,5 @@ import JL.Lemma
 import JL.EndToEnd
 import JL.InnerProduct
 import JL.QJL
+import JL.QJLDistortion
 import JL.Verify
