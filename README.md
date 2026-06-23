@@ -34,8 +34,7 @@ papers, you only ever need to read the **theorem statements** — never the proo
   what the corresponding paper result says?"* The table below answers exactly that: it maps each
   Lean theorem to its plain-math meaning and to the corresponding result in the source papers, so the
   statements can be spot-checked in a couple of minutes.
-- You can read every file directly on GitHub in your browser — no need to install Lean or build
-  anything. The build instructions further down are only for those who want to re-verify locally.
+- You can also read every file directly
 
 ## Theorem ↔ paper-lemma map
 
