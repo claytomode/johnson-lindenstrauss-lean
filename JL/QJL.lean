@@ -198,4 +198,109 @@ theorem sign_product_identity {d : ℕ} (u v : EuclideanSpace ℝ (Fin d)) (hu :
   rw [integral_congr_ae (Filter.Eventually.of_forall hpt), integral_add hI1 hI2,
     integral_const_mul, habs, hcross, add_zero, mul_comm]
 
+/-! ## Part 3: QJL asymmetric 1-bit estimator unbiasedness -/
+
+/-- Integrability of `g ↦ sign ⟪u,g⟫ · ⟪w,g⟫` under a standard Gaussian: the sign factor is
+bounded by `1` and `g ↦ ⟪w,g⟫` is integrable. -/
+theorem integrable_sign_inner_mul {d : ℕ} (u w : EuclideanSpace ℝ (Fin d)) :
+    Integrable (fun g : EuclideanSpace ℝ (Fin d) => Real.sign (⟪u, g⟫) * ⟪w, g⟫)
+      (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) := by
+  refine (integrable_inner_stdGaussian w).bdd_mul (c := 1) ?_ ?_
+  · exact (measurable_real_sign.comp
+      (by fun_prop : Measurable (fun g : EuclideanSpace ℝ (Fin d) => ⟪u, g⟫))).aestronglyMeasurable
+  · filter_upwards with g
+    rcases Real.sign_apply_eq (⟪u, g⟫) with h | h | h <;> rw [h] <;> norm_num
+
+/-- Marginalization: integrating a function of a single coordinate against a product of i.i.d.
+probability measures equals the single-coordinate integral. -/
+theorem integral_eval_pi {m : ℕ} {E : Type*} [MeasurableSpace E] (P : Measure E)
+    [IsProbabilityMeasure P] (i : Fin m) (f : E → ℝ) (hf : AEStronglyMeasurable f P) :
+    ∫ S : Fin m → E, f (S i) ∂(Measure.pi (fun _ => P)) = ∫ x, f x ∂P := by
+  have hmap : Measure.map (Function.eval i) (Measure.pi (fun _ : Fin m => P)) = P :=
+    (measurePreserving_eval (μ := fun _ : Fin m => P) i).map_eq
+  have h := integral_map (μ := Measure.pi (fun _ : Fin m => P)) (φ := Function.eval i) (f := f)
+    (measurable_pi_apply i).aemeasurable (by rwa [hmap])
+  rw [hmap] at h
+  exact h.symm
+
+/-- **The QJL asymmetric 1-bit estimator.** Given an `m × d` sketch `S` whose rows `S i` are
+i.i.d. standard Gaussian vectors, a `key` and a `query` `q`,
+`estimator = √(π/2) · (1/m) · Σᵢ sign ⟪key/‖key‖, sᵢ⟫ · ⟪q, sᵢ⟫`. -/
+noncomputable def qjlEstimator {m d : ℕ} (key q : EuclideanSpace ℝ (Fin d))
+    (S : Fin m → EuclideanSpace ℝ (Fin d)) : ℝ :=
+  Real.sqrt (π / 2) *
+    ((m : ℝ)⁻¹ * ∑ i, Real.sign (⟪‖key‖⁻¹ • key, S i⟫) * ⟪q, S i⟫)
+
+/-- **QJL unbiasedness.** Over an `m × d` i.i.d. standard-Gaussian sketch, the asymmetric 1-bit
+estimator is unbiased for the normalized inner product `⟪key/‖key‖, q⟫`. -/
+theorem qjlEstimator_unbiased {m d : ℕ} (hm : 0 < m)
+    (key q : EuclideanSpace ℝ (Fin d)) (hkey : key ≠ 0) :
+    ∫ S, qjlEstimator key q S
+        ∂(Measure.pi
+          (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+      = ⟪‖key‖⁻¹ • key, q⟫ := by
+  have hkne : ‖key‖ ≠ 0 := by simpa [norm_eq_zero] using hkey
+  have hu : ‖(‖key‖⁻¹ • key : EuclideanSpace ℝ (Fin d))‖ = 1 := by
+    rw [norm_smul, norm_inv, norm_norm]
+    exact inv_mul_cancel₀ hkne
+  -- per-row integrability under the product measure
+  have hsummand : ∀ i : Fin m,
+      Integrable (fun S : Fin m → EuclideanSpace ℝ (Fin d) =>
+        Real.sign (⟪‖key‖⁻¹ • key, S i⟫) * ⟪q, S i⟫)
+        (Measure.pi
+          (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))) := by
+    intro i
+    have hmap : Measure.map (Function.eval i)
+        (Measure.pi
+          (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+        = ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)) :=
+      (measurePreserving_eval
+        (μ := fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) i).map_eq
+    have hI : Integrable (fun g => Real.sign (⟪‖key‖⁻¹ • key, g⟫) * ⟪q, g⟫)
+        (Measure.map (Function.eval i)
+          (Measure.pi
+            (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))) := by
+      rw [hmap]; exact integrable_sign_inner_mul (‖key‖⁻¹ • key) q
+    exact hI.comp_measurable (measurable_pi_apply i)
+  -- per-row expectation is the sign-product identity
+  have hrow : ∀ i : Fin m,
+      ∫ S : Fin m → EuclideanSpace ℝ (Fin d),
+          Real.sign (⟪‖key‖⁻¹ • key, S i⟫) * ⟪q, S i⟫
+          ∂(Measure.pi
+            (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))))
+        = Real.sqrt (2 / π) * ⟪‖key‖⁻¹ • key, q⟫ := by
+    intro i
+    have h := integral_eval_pi
+      (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) i
+      (fun g => Real.sign (⟪‖key‖⁻¹ • key, g⟫) * ⟪q, g⟫)
+      (integrable_sign_inner_mul (‖key‖⁻¹ • key) q).aestronglyMeasurable
+    rw [h]
+    exact sign_product_identity (‖key‖⁻¹ • key) q hu
+  -- assemble via linearity of the integral
+  simp only [qjlEstimator]
+  rw [integral_const_mul, integral_const_mul,
+    integral_finsetSum Finset.univ (fun i _ => hsummand i)]
+  rw [Finset.sum_congr rfl (fun i _ => hrow i), Finset.sum_const, Finset.card_univ,
+    Fintype.card_fin, nsmul_eq_mul]
+  have hmne : (m : ℝ) ≠ 0 := Nat.cast_ne_zero.mpr hm.ne'
+  have hsqrt : Real.sqrt (π / 2) * Real.sqrt (2 / π) = 1 := by
+    rw [← Real.sqrt_mul (by positivity), show (π / 2) * (2 / π) = 1 by field_simp, Real.sqrt_one]
+  calc Real.sqrt (π / 2) *
+          ((m : ℝ)⁻¹ * ((m : ℝ) * (Real.sqrt (2 / π) * ⟪‖key‖⁻¹ • key, q⟫)))
+      = (Real.sqrt (π / 2) * Real.sqrt (2 / π)) *
+          (((m : ℝ)⁻¹ * (m : ℝ)) * ⟪‖key‖⁻¹ • key, q⟫) := by ring
+    _ = 1 * (1 * ⟪‖key‖⁻¹ • key, q⟫) := by rw [hsqrt, inv_mul_cancel₀ hmne]
+    _ = ⟪‖key‖⁻¹ • key, q⟫ := by ring
+
+/-- **QJL unbiasedness, un-normalized form.** `‖key‖ · E[estimator] = ⟪key, q⟫`. -/
+theorem qjlEstimator_unbiased_inner {m d : ℕ} (hm : 0 < m)
+    (key q : EuclideanSpace ℝ (Fin d)) (hkey : key ≠ 0) :
+    ‖key‖ * (∫ S, qjlEstimator key q S
+        ∂(Measure.pi
+          (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))))
+      = ⟪key, q⟫ := by
+  have hkne : ‖key‖ ≠ 0 := by simpa [norm_eq_zero] using hkey
+  rw [qjlEstimator_unbiased hm key q hkey, real_inner_smul_left, ← mul_assoc,
+    mul_inv_cancel₀ hkne, one_mul]
+
 end JL

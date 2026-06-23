@@ -6,6 +6,7 @@ import JL.Rotation
 import JL.Lemma
 import JL.EndToEnd
 import JL.InnerProduct
+import JL.QJL
 
 /-!
 # Verification: sanity instantiations and axiom audit
@@ -70,3 +71,7 @@ end JL
 #print axioms JL.johnson_lindenstrauss
 #print axioms JL.johnson_lindenstrauss_pointset
 #print axioms JL.inner_product_preservation
+#print axioms JL.integral_abs_gaussianReal
+#print axioms JL.sign_product_identity
+#print axioms JL.qjlEstimator_unbiased
+#print axioms JL.qjlEstimator_unbiased_inner
