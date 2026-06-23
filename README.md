@@ -1,5 +1,5 @@
 # johnson-lindenstrauss-lean
-
+## WIP
 A zero-`sorry` Lean 4 / mathlib formalization of the **Johnson–Lindenstrauss lemma**.
 
 The probabilistic core is **chi-squared concentration**: the moment generating
