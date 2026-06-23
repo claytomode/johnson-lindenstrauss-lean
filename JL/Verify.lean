@@ -19,6 +19,7 @@ genuinely `sorry`-free.
 -/
 
 open MeasureTheory ProbabilityTheory Real
+open scoped RealInnerProductSpace
 
 namespace JL
 
@@ -58,6 +59,17 @@ example {d k : ℕ} (hk : 0 < k) (p : Fin 0 → EuclideanSpace ℝ (Fin d)) :
         mul_zero, Real.log_zero]
       nlinarith [hkR])
 
+/-- The exponential (sub-Gaussian) QJL distortion bound is now **unconditional**: it no longer
+requires the `IsPerRowSubgaussian` hypothesis, which is discharged by
+`isPerRowSubgaussian_normalized`. -/
+example {m d : ℕ} (hm : 0 < m) (key q : EuclideanSpace ℝ (Fin d)) (hkey : key ≠ 0)
+    {ε : ℝ} (hε : 0 < ε) :
+    (Measure.pi
+        (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
+        {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
+      ≤ 2 * rexp (-((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2)) :=
+  qjlEstimator_concentration_exp hm key q hkey hε
+
 end JL
 
 -- Axiom audit for the main results.
@@ -79,5 +91,8 @@ end JL
 #print axioms JL.qjl_perrow_variance_le
 #print axioms JL.qjlEstimator_variance_le
 #print axioms JL.qjlEstimator_concentration
+#print axioms JL.foldedNormal_subgaussian
+#print axioms JL.isPerRowSubgaussian_of_unit
+#print axioms JL.isPerRowSubgaussian_normalized
 #print axioms JL.qjlEstimator_centered_hasSubgaussianMGF
 #print axioms JL.qjlEstimator_concentration_exp

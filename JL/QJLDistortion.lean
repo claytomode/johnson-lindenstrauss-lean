@@ -187,23 +187,24 @@ The Chebyshev bound above decays only polynomially in `m`. The classical QJL gua
 *exponential* tail, obtained by showing the per-row sign-product term is sub-Gaussian and summing
 over the `m` independent rows.
 
-The single ingredient that is **not** provable from the current mathlib API is the per-row
-sub-Gaussian moment-generating-function bound itself: bounding `E[exp(t·(√(π/2)·sign⟪u,g⟫·⟪q,g⟫))]`
-sharply requires a folded-normal / `erf` sub-Gaussian estimate for `|⟪u,g⟫|` (a domination shortcut
-is unavailable — the crude `exp(t|x|) ≤ exp(tx)+exp(-tx)` route loses a factor `2` per row, which is
-fatal for `m` rows). We therefore isolate exactly this fact as the predicate `IsPerRowSubgaussian`
-and discharge **everything else** (coordinate independence under `Measure.pi`, additivity of the
-sub-Gaussian parameter over independent rows, the `1/m` rescaling, and the two-sided Chernoff bound)
-fully and unconditionally. -/
+The crux is the per-row sub-Gaussian moment-generating-function bound: bounding
+`E[exp(t·(√(π/2)·sign⟪u,g⟫·⟪q,g⟫))]` sharply requires a folded-normal sub-Gaussian estimate for
+`|⟪u,g⟫|` (the crude `exp(t|x|) ≤ exp(tx)+exp(-tx)` route loses a factor `2` per row, which is fatal
+for `m` rows). That estimate is **not** in mathlib, so we build it from scratch in
+`JL/GaussianTail.lean` (`foldedNormal_subgaussian`) and assemble the per-row bound here in
+`isPerRowSubgaussian_of_unit` / `isPerRowSubgaussian_normalized`. With this in hand the entire
+exponential bound — per-row MGF, coordinate independence under `Measure.pi`, additivity of the
+sub-Gaussian parameter over independent rows, the `1/m` rescaling, and the two-sided Chernoff bound —
+is proved fully and **unconditionally**. -/
 
 open scoped RealInnerProductSpace in
-/-- **The one remaining analytic gap.** For a (unit) vector `u` and arbitrary `q`, the centered,
-`√(π/2)`-scaled per-row sign-product term `g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫` has a sub-Gaussian
-moment generating function with variance proxy `(π/2)·‖q‖²` under the standard Gaussian.
+/-- The centered, `√(π/2)`-scaled per-row sign-product term
+`g ↦ √(π/2)·sign⟪u,g⟫·⟪q,g⟫ − ⟪u,q⟫` has a sub-Gaussian moment generating function with variance
+proxy `(π/2)·‖q‖²` under the standard Gaussian.
 
-This is classically true (with this sharp constant when `‖u‖ = 1`), but a Lean proof needs a
-folded-normal sub-Gaussian estimate not yet in mathlib, so it is taken as a hypothesis by the
-exponential distortion bound below. It is the *only* demoted step in the entire development. -/
+This is proved unconditionally for the normalized key direction by `isPerRowSubgaussian_normalized`
+(and for any unit `u` by `isPerRowSubgaussian_of_unit`); the named predicate is kept as a convenient
+abbreviation used by the exponential distortion bound below. -/
 @[reducible] def IsPerRowSubgaussian {d : ℕ} (u q : EuclideanSpace ℝ (Fin d)) : Prop :=
   HasSubgaussianMGF
     (fun g : EuclideanSpace ℝ (Fin d) =>
@@ -456,13 +457,36 @@ theorem isPerRowSubgaussian_of_unit {d : ℕ} (u q : EuclideanSpace ℝ (Fin d))
   rw [htarget] at hofmap
   exact hofmap
 
-/-- **Centered estimator is sub-Gaussian.** Assuming the per-row sub-Gaussian MGF bound
-(`IsPerRowSubgaussian`), the centered estimator `qjlEstimator − ⟪key/‖key‖, q⟫` is sub-Gaussian with
-variance proxy `(π/2)·‖q‖² / m` under the `m`-fold product Gaussian, by summing the `m` i.i.d.
-per-row terms (independent coordinates of `Measure.pi`) and rescaling by `1/m`. -/
+open scoped RealInnerProductSpace in
+/-- **Per-row sub-Gaussian MGF bound for the normalized key, proved unconditionally.** For any
+`key` and `q`, the normalized direction `‖key‖⁻¹ • key` satisfies `IsPerRowSubgaussian`. When
+`key ≠ 0` this is the unit case `isPerRowSubgaussian_of_unit`; when `key = 0` the normalized
+direction is `0`, the per-row term is identically `0`, and the bound is trivial. -/
+theorem isPerRowSubgaussian_normalized {d : ℕ} (key q : EuclideanSpace ℝ (Fin d)) :
+    IsPerRowSubgaussian (‖key‖⁻¹ • key) q := by
+  rcases eq_or_ne key 0 with hkey | hkey
+  · subst hkey
+    rw [smul_zero]
+    refine HasSubgaussianMGF.congr (X := fun _ => (0 : ℝ)) ?_ ?_
+    · refine ⟨fun t => by simpa using integrable_const (1 : ℝ), fun t => ?_⟩
+      have hmgf : mgf (fun _ : EuclideanSpace ℝ (Fin d) => (0 : ℝ))
+          (ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d))) t = 1 := by
+        rw [mgf]; simp
+      rw [hmgf]
+      exact Real.one_le_exp (by positivity)
+    · filter_upwards with g
+      simp [inner_zero_left, Real.sign_zero]
+  · have hkne : ‖key‖ ≠ 0 := by simpa [norm_eq_zero] using hkey
+    have hu : ‖(‖key‖⁻¹ • key : EuclideanSpace ℝ (Fin d))‖ = 1 := by
+      rw [norm_smul, norm_inv, norm_norm]; exact inv_mul_cancel₀ hkne
+    exact isPerRowSubgaussian_of_unit _ q hu
+
+/-- **Centered estimator is sub-Gaussian.** The centered estimator `qjlEstimator − ⟪key/‖key‖, q⟫`
+is sub-Gaussian with variance proxy `(π/2)·‖q‖² / m` under the `m`-fold product Gaussian, by summing
+the `m` i.i.d. per-row terms (independent coordinates of `Measure.pi`) and rescaling by `1/m`. The
+per-row sub-Gaussian bound is supplied unconditionally by `isPerRowSubgaussian_normalized`. -/
 theorem qjlEstimator_centered_hasSubgaussianMGF {m d : ℕ} (hm : 0 < m)
-    (key q : EuclideanSpace ℝ (Fin d))
-    (hsub : IsPerRowSubgaussian (‖key‖⁻¹ • key) q) :
+    (key q : EuclideanSpace ℝ (Fin d)) :
     HasSubgaussianMGF (fun S => qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫)
       ⟨π / 2 * ‖q‖ ^ 2 / m, by positivity⟩
       (Measure.pi (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))) := by
@@ -490,7 +514,7 @@ theorem qjlEstimator_centered_hasSubgaussianMGF {m d : ℕ} (hm : 0 < m)
         ((Measure.pi
           (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).map
             (fun f : Fin m → EuclideanSpace ℝ (Fin d) => f i)) := by
-      rw [hmap]; exact hsub
+      rw [hmap]; exact isPerRowSubgaussian_normalized key q
     exact HasSubgaussianMGF.of_map (X := G)
       (Y := fun f : Fin m → EuclideanSpace ℝ (Fin d) => f i)
       (measurable_pi_apply i).aemeasurable h2
@@ -524,20 +548,19 @@ theorem qjlEstimator_centered_hasSubgaussianMGF {m d : ℕ} (hm : 0 < m)
   field_simp
 
 open scoped RealInnerProductSpace in
-/-- **QJL exponential distortion bound (sub-Gaussian / Chernoff).** Assuming the per-row sub-Gaussian
-MGF bound (`IsPerRowSubgaussian`), the asymmetric 1-bit estimator deviates from the true normalized
-inner product `⟪key/‖key‖, q⟫` by at least `ε` with probability at most
+/-- **QJL exponential distortion bound (sub-Gaussian / Chernoff).** The asymmetric 1-bit estimator
+deviates from the true normalized inner product `⟪key/‖key‖, q⟫` by at least `ε` with probability at
+most
 `2 · exp(-m·ε² / (π·‖q‖²))`, an exponential (rather than polynomial) improvement over the Chebyshev
 bound `qjlEstimator_concentration`. Hence `m = O(‖q‖²·log(1/δ)/ε²)` sign-bits suffice for additive
 error `ε` with probability `1 − δ`. -/
 theorem qjlEstimator_concentration_exp {m d : ℕ} (hm : 0 < m)
-    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε)
-    (hsub : IsPerRowSubgaussian (‖key‖⁻¹ • key) q) :
+    (key q : EuclideanSpace ℝ (Fin d)) (_hkey : key ≠ 0) {ε : ℝ} (hε : 0 < ε) :
     (Measure.pi
         (fun _ : Fin m => ProbabilityTheory.stdGaussian (EuclideanSpace ℝ (Fin d)))).real
         {S | ε ≤ |qjlEstimator key q S - ⟪‖key‖⁻¹ • key, q⟫|}
       ≤ 2 * Real.exp (-((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2)) := by
-  have hDsub := qjlEstimator_centered_hasSubgaussianMGF hm key q hsub
+  have hDsub := qjlEstimator_centered_hasSubgaussianMGF hm key q
   -- the Chernoff exponent simplifies to the clean constant (`↑⟨a,_⟩` is defeq `a`)
   have hcoe : -ε ^ 2 / (2 * (π / 2 * ‖q‖ ^ 2 / (m : ℝ)))
       = -((m : ℝ) * ε ^ 2) / (π * ‖q‖ ^ 2) := by
