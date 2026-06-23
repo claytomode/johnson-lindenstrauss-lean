@@ -62,7 +62,7 @@ lemma log_one_add_le {ε : ℝ} (hε : 0 ≤ ε) :
     have h2 := pow_nonneg hx.le 2
     have h3 := pow_nonneg hx.le 3
     linarith
-  have key := hmono Set.left_mem_Ici (Set.mem_Ici.mpr hε) hε
+  have key := hmono Set.self_mem_Ici (Set.mem_Ici.mpr hε) hε
   have lhs0 : (fun y : ℝ => y - y ^ 2 / 2 + y ^ 3 / 2 - Real.log (1 + y)) 0 = 0 := by simp
   have rhsε : (fun y : ℝ => y - y ^ 2 / 2 + y ^ 3 / 2 - Real.log (1 + y)) ε
       = ε - ε ^ 2 / 2 + ε ^ 3 / 2 - Real.log (1 + ε) := rfl
